@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import time
+from logging.handlers import RotatingFileHandler
 import os
 import re
 import logging
@@ -11,12 +13,21 @@ from shutil import copy
 from daemonize import Daemonize
 import click
 import platform
-from .picker import pick
+from inkscapefigures.picker import pick
 import pyperclip
 from appdirs import user_config_dir
+from inkscape_svg_to_typst.typst_inkscape import process_svg
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
-log = logging.getLogger('inkscape-figures')
+log = logging.getLogger('inkscape-figures-typst')
+debug_log_path = Path("/Users/dobbikov/Desktop/log.log")
+fh = RotatingFileHandler(debug_log_path, maxBytes=2_000_000, backupCount=5)
+fh.setLevel(logging.DEBUG)
+fh.setFormatter(logging.Formatter(
+    fmt="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+))
+log.addHandler(fh)
 
 def inkscape(path):
     with warnings.catch_warnings():
@@ -32,14 +43,15 @@ def indent(text, indentation=0):
 def beautify(name):
     return name.replace('_', ' ').replace('-', ' ').title()
 
-def latex_template(name, title):
+
+
+
+
+def typst_template(name, title):
     return '\n'.join((
-        r"\begin{figure}[ht]",
-        r"    \centering",
-        rf"    \incfig{{{name}}}",
-        rf"    \caption{{{title}}}",
-        rf"    \label{{fig:{name}}}",
-        r"\end{figure}"))
+        f"#import \"figures/{name}.typ\":diagram as {name}",
+        f"#{name}()"
+        ))
 
 # From https://stackoverflow.com/a/67692
 def import_file(name, path):
@@ -71,7 +83,7 @@ if not template.is_file():
 
 if config.exists():
     config_module = import_file('config', config)
-    latex_template = config_module.latex_template
+    typst_template = config_module.typst_template
 
 
 def add_root(path):
@@ -105,8 +117,9 @@ def watch(daemon):
         watcher_cmd = watch_daemon_fswatch
 
     if daemon:
-        daemon = Daemonize(app='inkscape-figures',
-                           pid='/tmp/inkscape-figures.pid',
+        temp_app = ""
+        daemon = Daemonize(app='inkscape-figures-typst',
+                           pid='/tmp/inkscape-figures-typst.pid',
                            action=watcher_cmd)
         daemon.start()
         log.info("Watching figures.")
@@ -125,7 +138,8 @@ def maybe_recompile_figure(filepath):
 
     log.info('Recompiling %s', filepath)
 
-    pdf_path = filepath.parent / (filepath.stem + '.pdf')
+    # csv_path = filepath.parent / (filepath.stem + '.csv')
+    csv_path = filepath
     name = filepath.stem
 
     inkscape_version = subprocess.check_output(['inkscape', '--version'], universal_newlines=True)
@@ -141,41 +155,20 @@ def maybe_recompile_figure(filepath):
     # Right-pad the array with zeros (so [1, 1] becomes [1, 1, 0])
     inkscape_version_number= inkscape_version_number + [0] * (3 - len(inkscape_version_number))
 
-    # Tuple comparison is like version comparison
-    if inkscape_version_number < [1, 0, 0]:
-        command = [
-            'inkscape',
-            '--export-area-page',
-            '--export-dpi', '300',
-            '--export-pdf', pdf_path,
-            '--export-latex', filepath
-            ]
-    else:
-        command = [
-            'inkscape', filepath,
-            '--export-area-page',
-            '--export-dpi', '300',
-            '--export-type=pdf',
-            '--export-latex',
-            '--export-filename', pdf_path
-            ]
-
-    log.debug('Running command:')
-    log.debug(textwrap.indent(' '.join(str(e) for e in command), '    '))
+    log.info('Running command:')
 
     # Recompile the svg file
-    completed_process = subprocess.run(command)
+    try:
+        process_svg(csv_path)
+    except Exception:
+        pass
 
-    if completed_process.returncode != 0:
-        log.error('Return code %s', completed_process.returncode)
-    else:
-        log.debug('Command succeeded')
 
     # Copy the LaTeX code to include the file to the clipboard
-    template = latex_template(name, beautify(name))
+    template = typst_template(name, beautify(name))
     pyperclip.copy(template)
-    log.debug('Copying LaTeX template:')
-    log.debug(textwrap.indent(template, '    '))
+    log.info('Copying typst template:')
+    log.info(textwrap.indent(template, '    '))
 
 def watch_daemon_inotify():
     import inotify.adapters
@@ -241,6 +234,8 @@ def watch_daemon_fswatch():
                 p.terminate()
                 log.debug('Removed main watch %s')
                 break
+            if "_dobb_clean" in filepath:
+                continue
             maybe_recompile_figure(filepath)
 
 
@@ -280,7 +275,7 @@ def create(title, root):
     # Print the code for including the figure to stdout.
     # Copy the indentation of the input.
     leading_spaces = len(title) - len(title.lstrip())
-    print(indent(latex_template(figure_path.stem, title), indentation=leading_spaces))
+    print(indent(typst_template(figure_path.stem, title), indentation=leading_spaces))
 
 @cli.command()
 @click.argument(
@@ -310,10 +305,16 @@ def edit(root):
         inkscape(path)
 
         # Copy the LaTeX code to include the file to the clipboard
-        template = latex_template(path.stem, beautify(path.stem))
+        template = typst_template(path.stem, beautify(path.stem))
         pyperclip.copy(template)
-        log.debug('Copying LaTeX template:')
+        log.debug('Copying Typst template:')
         log.debug(textwrap.indent(template, '    '))
 
+@cli.command()
+def testwatch():
+    watch_daemon_fswatch()
+
 if __name__ == '__main__':
+    # maybe_recompile_figure("/Users/dobbikov/Desktop/typst/test_notes/figures/test-fig.svg")
     cli()
+    # watch_daemon_fswatch()
