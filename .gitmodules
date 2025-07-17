@@ -1,0 +1,3 @@
+[submodule "inkscape_svg_to_typst"]
+	path = inkscape_svg_to_typst
+	url = https://github.com/DobbiKov/inkscape_svg_to_typst.git
