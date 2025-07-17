@@ -64,7 +64,7 @@ def import_file(name, path):
 
 # Load user config
 
-user_dir = Path(user_config_dir("inkscape-figures", "Castel"))
+user_dir = Path(user_config_dir("inkscape-figures-typst", "Castel"))
 
 if not user_dir.is_dir():
     user_dir.mkdir()

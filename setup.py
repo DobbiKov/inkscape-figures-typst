@@ -20,14 +20,14 @@ if find_executable("fswatch") is None:
                 )
 
 setup(
-    name="inkscape-figures",
+    name="inkscape-figures-typst",
     version="1.0.7",
     description="Script for managing inkscape figures",
     long_description=readme(),
     long_description_content_type="text/markdown",
-    url="https://github.com/gillescastel/inkscape-figures",
-    author="Gilles Castel",
-    author_email="gilles@castel.dev",
+    url="https://github.com/DobbiKov/inkscape-figures-typst",
+    author="Yehor Korotenko",
+    author_email="yehor.korotenko@outlook.com",
     license="MIT",
     classifiers=[
         "License :: OSI Approved :: MIT License",
@@ -35,7 +35,7 @@ setup(
         "Programming Language :: Python :: 3.7",
     ],
     packages=['inkscapefigures', 'inkscape_svg_to_typst'],
-    scripts=['bin/inkscape-figures'],
+    scripts=['bin/inkscape-figures-typst'],
     install_requires=dependencies,
     include_package_data=True
 )
