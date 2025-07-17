@@ -9,7 +9,7 @@ def readme():
         return f.read()
 
 
-dependencies = ['pyperclip', 'click', 'appdirs', 'daemonize']
+dependencies = ['pyperclip', 'click', 'appdirs', 'daemonize', 'lxml', 'numpy']
 if find_executable("fswatch") is None:
     if platform.system() == "Linux":
         dependencies.append("inotify")
@@ -34,7 +34,7 @@ setup(
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.7",
     ],
-    packages=['inkscapefigures'],
+    packages=['inkscapefigures', 'inkscape_svg_to_typst'],
     scripts=['bin/inkscape-figures'],
     install_requires=dependencies,
     include_package_data=True
