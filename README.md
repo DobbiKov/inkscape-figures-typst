@@ -1,7 +1,6 @@
 # Inkscape figure manager.
 
-A script I use to manage figures for my LaTeX documents.
-More information in this [blog post](https://castel.dev/post/lecture-notes-2/).
+A script for managing figures done in `inkscape` for typst documents. The base for this script is [insckape-figures](https://github.com/gillescastel/inkscape-figures) done by [Gilles Castel](https://github.com/gillescastel).
 
 ## Requirements
 
@@ -15,7 +14,7 @@ You need Python >= 3.7, as well as a picker. Current supported pickers are:
 You can install it using pip:
 
 ```
-pip3 install inkscape-figures
+pip3 install git+https://github.com/DobbiKov/inkscape-figures-typst.git
 ```
 
 This package currently works on Linux and MacOS. If you're interested in porting it to Windows, feel free to make a pull request.
@@ -24,57 +23,88 @@ This package currently works on Linux and MacOS. If you're interested in porting
 
 Add the following code to the preamble of your LateX document.
 
-```tex
-\usepackage{import}
-\usepackage{pdfpages}
-\usepackage{transparent}
-\usepackage{xcolor}
-
-\newcommand{\incfig}[2][1]{%
-    \def\svgwidth{#1\columnwidth}
-    \import{./figures/}{#2.pdf_tex}
-}
-
-\pdfsuppresswarningpagegroup=1
-```
-This defines a command `\incfig` which can be used to include Inkscape figures.
-By default, `\incfig{figure-name}` make the figure as wide as the page, but it's also possible to change the width by providing an optional argument: `\incfig[0.3]{figure-name}`.
-
-The settings above assume the following directory structure:
+The script assumes the following directory structure:
 
 ```
-master.tex
+main.tex
 figures/
-    figure1.pdf_tex
     figure1.svg
-    figure1.pdf
-    figure2.pdf_tex
     figure2.svg
-    figure2.pdf
 ```
 
 ## Usage
 
-* Watch for figures: `inkscape-figures watch`.
-* Creating a figure: `inkscape-figures create 'title'`. This uses `~/.config/inkscape-figures/template.svg` as a template.
-* Creating a figure in a specific directory: `inkscape-figures create 'title' path/to/figures/`.
-* Select figure and edit it: `inkscape-figures edit`.
-* Select figure in a specific directory and edit it: `inkscape-figures edit path/to/figures/`.
+* Watch for figures: `inkscape-figures-typst watch`.
+* Creating a figure: `inkscape-figures-typst create 'title'`. This uses `~/.config/inkscape-figures-typst/template.svg` as a template.
+* Creating a figure in a specific directory: `inkscape-figures-typst create 'title' path/to/figures/`.
+* Select figure and edit it: `inkscape-figures-typst edit`.
+* Select figure in a specific directory and edit it: `inkscape-figures-typst edit path/to/figures/`.
 
 ## Vim mappings
 
-This assumes that you use [VimTeX](https://github.com/lervag/vimtex).
+This assumes that you use [TinyMist]([https://github.com/lervag/vimtex](https://github.com/Myriad-Dreamin/tinymist)).
 
-```vim
-inoremap <C-f> <Esc>: silent exec '.!inkscape-figures create "'.getline('.').'" "'.b:vimtex.root.'/figures/"'<CR><CR>:w<CR>
-nnoremap <C-f> : silent exec '!inkscape-figures edit "'.b:vimtex.root.'/figures/" > /dev/null 2>&1 &'<CR><CR>:redraw!<CR>
+```lua
+-- safely get a project root (LSP tinymist → fallback to file’s dir)
+local function get_typst_root()
+  local bufnr = vim.api.nvim_get_current_buf()
+  for _, client in pairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+    if client.name == "tinymist" then
+      local root = client.config.root_dir
+      if root and root ~= "" then
+        return root
+      end
+    end
+  end
+  -- fallback if LSP didn’t give you anything
+  return vim.fn.expand("%:p:h")
+end
+
+-- helper to build and run a shell command safely
+local function run_cmd(fmt, ...)
+  local args = vim.tbl_map(vim.fn.shellescape, { ... })
+  local cmd = string.format(fmt, unpack(args))
+  vim.cmd(cmd)
+end
+
+-- insert‑mode mapping
+vim.keymap.set("i", "<C-f>", function()
+  local file = vim.fn.expand("%:t")
+  if file:match("%.tex$") then
+    -- TeX case, using vimtex.root
+    run_cmd('silent exec ".!inkscape-figures create %s %s"', 
+      vim.fn.getline("."), vim.b.vimtex.root .. "/figures/")
+  elseif file:match("%.typ$") then
+    -- Typst case, using our safe root
+    local root = get_typst_root() .. "/figures/"
+    run_cmd('silent exec ".!/Users/dobbikov/Desktop/coding/projects/inkscape-figures/inkscapefigures/main.py create %s %s"',
+      vim.fn.getline("."), root)
+  end
+  vim.cmd("write")
+end, { noremap = true, silent = true })
+
+-- normal‑mode mapping
+vim.keymap.set("n", "<C-f>", function()
+  local file = vim.fn.expand("%:t")
+  if file:match("%.tex$") then
+    run_cmd('silent exec "!inkscape-figures edit %s > /dev/null 2>&1 &"',
+      vim.b.vimtex.root .. "/figures/")
+  elseif file:match("%.typ$") then
+    local root = get_typst_root() .. "/figures/"
+    run_cmd('silent exec ".!/Users/dobbikov/Desktop/coding/projects/inkscape-figures/inkscapefigures/main.py edit %s"',
+      root)
+  end
+  vim.cmd("write")
+  vim.cmd("redraw!")
+end, { noremap = true, silent = true })
 ```
+The config provided above is compatible with the figure manager provided by [Gilles Castel](https://github.com/gillescastel).
 
-First, run `inkscape-figures watch` in a terminal to setup the file watcher.
+First, run `inkscape-figures-typst watch` in a terminal to setup the file watcher.
 Now, to add a figure, type the title on a new line, and press <kbd>Ctrl+F</kbd> in insert mode.
 This does the following:
 
-1. Find the directory where figures should be saved depending on which file you're editing and where the main LaTeX file is located, using `b:vimtex.root`.
+1. Find the directory where figures should be saved depending on which file you're editing and where the main typst file is located, using `tinymist`.
 1. Check if there exists a figure with the same name. If there exists one, do nothing; if not, go on.
 1. Copy the figure template to the directory containing the figures.
 1. In Vim: replace the current line – the line containing figure title – with the LaTeX code for including the figure.
@@ -89,12 +119,9 @@ To edit figures, press <kbd>Ctrl+F</kbd> in command mode, and a fuzzy search sel
 You can change the default LaTeX template by creating `~/.config/inkscape-figures/config.py` and adding something along the lines of the following:
 
 ```python
-def latex_template(name, title):
-    return '\n'.join((r"\begin{figure}[ht]",
-                      r"    This is a custom LaTeX template!",
-                      r"    \centering",
-                      rf"    \incfig[1]{{{name}}}",
-                      rf"    \caption{{{title}}}",
-                      rf"    \label{{fig:{name}}}",
-                      r"\end{figure}"))
+def typst_template(name, title):
+    return '\n'.join((
+        f"#import \"figures/{name}.typ\":diagram as {name}",
+        f"#{name}()"
+        ))
 ```
