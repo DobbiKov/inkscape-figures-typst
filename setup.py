@@ -15,14 +15,14 @@ if find_executable("fswatch") is None:
         dependencies.append("inotify")
     else:
         raise ValueError(
-                "inkscape-figures needs fswatch to run on MacOS. You "
+                "inkscape-figures-typst needs fswatch to run on MacOS. You "
                 "can install it using `brew install fswatch`"
                 )
 
 setup(
     name="inkscape-figures-typst",
     version="1.0.7",
-    description="Script for managing inkscape figures",
+    description="Script for managing inkscape figures with typst",
     long_description=readme(),
     long_description_content_type="text/markdown",
     url="https://github.com/DobbiKov/inkscape-figures-typst",
