@@ -125,3 +125,6 @@ def typst_template(name, title):
         f"#{name}()"
         ))
 ```
+
+## TODO
+- [ ] Mappings for VSCode
